@@ -1,28 +1,26 @@
 # -*- coding: utf-8 -*-
 
-# Python 3.3 Module
-# Chromium 29.0.1547.57 (217859)
-# HexChat 2.9.6
+# Originally made for Python 3.3
 
-__module_name__ = "Now Playing Extended"
-__module_version__ = "1.1"
-__module_description__ = "Displayes the current song using the /np command"
-
+from __future__ import print_function
 import hexchat
-hexchat.emit_print("Generic Message", "Loading", "{} {} - {}".format(
-                   __module_name__, __module_version__,
-                   __module_description__))
+
+__module_name__ = 'Now Playing'
+__module_version__ = '1.2'
+__module_description__ = 'Displays the current song using the /np command'
+__author__ = 'https://github.com/knitori'
 
 from mpd import MPDClient
 
 import os
 import json
-import http.client
 import subprocess
-from urllib.parse import urlparse
-from html import entities
 import re
 
+#Only works using Python 3 (might be obsolete)
+#import http.client
+#from urllib.parse import urlparse
+#from html import entities
 
 def _repl(m):
     '''helper function for unescape_entities()'''
@@ -42,8 +40,7 @@ def unescape_entities(text):
     unescapes html entities such as &quot; &lt; etc and
     also &#x12af; and &#123; codepoints.
     '''
-    return re.sub(r'&(?:(?P<hex>#x[a-fA-F0-9]+)|(?P<num>#[0-9]+)'
-                  '|(?P<name>\w+));', _repl, text, re.I)
+    return re.sub(r'&(?:(?P<hex>#x[a-fA-F0-9]+)|(?P<num>#[0-9]+)|(?P<name>\w+));', _repl, text, re.I)
 
 
 def safe_to_send(text):
@@ -55,7 +52,7 @@ def safe_to_send(text):
 
 def get_mplayer_string():
     '''
-        gets the current title played in mplayer or gnome-mplayer
+        gets the current title played in mpv
         using the cheap method of reading it from the `ps` command.
     '''
     ret = None
@@ -66,28 +63,6 @@ def get_mplayer_string():
         player_found = 'mpv'
     except subprocess.CalledProcessError:
         pass
-
-    if ret is None:
-        try:
-            ret = subprocess.check_output(['pidof', 'smplayer'])
-            player_found = 'smplayer'
-        except subprocess.CalledProcessError:
-            pass
-
-    if ret is None:
-        try:
-            ret = subprocess.check_output(['pidof', 'gnome-mplayer'])
-            player_found = 'gnome-mplayer'
-        except subprocess.CalledProcessError:
-            pass
-
-    # smplayer (or other) might invoke the mplayer. so mplayer is last
-    if ret is None:
-        try:
-            ret = subprocess.check_output(['pidof', 'mplayer'])
-            player_found = 'mplayer'
-        except subprocess.CalledProcessError:
-            pass
 
     if ret is None:
         return
@@ -113,12 +88,12 @@ def get_mplayer_string():
     if len(ext) <= 5:
         mplayer_string = filename
     if mplayer_string != '':
-        return mplayer_string + ' ({})'.format(player_found)
+        return mplayer_string
 
 
 def get_mpd_string():
     '''
-        gets the current song using MPDClien library
+        gets the current song using MPDClient library
         https://github.com/Mic92/python-mpd2
         $ pip install python-mpd2
     '''
@@ -139,17 +114,13 @@ def get_mpd_string():
 
     artist = song.get('artist', None)
     if isinstance(artist, list):
-        artist = ' ／ '.join(artist)
+    	artist = ' ／ '.join(artist)
 
     title = song.get('title', None)
     if isinstance(title, list):
-        title = ' ／ '.join(title)
+    	title = ' ／ '.join(title)
 
-    album = song.get('album', None)
-    if isinstance(album, list):
-        album = ' ／ '.join(album)
-
-    if artist is None and title is None and album is None:
+    if artist is None and title is None:
         filename = song.get('file', None)
         if filename is not None:
             filename = filename
@@ -161,13 +132,11 @@ def get_mpd_string():
     else:
         if artist is not None:
             metalist.append(artist)
-        if album is not None:
-            metalist.append(album)
         if title is not None:
             metalist.append(title)
 
     if len(metalist) == 0:
-        hexchat.prnt('Keine Metadaten gefunden.')
+        hexchat.prnt('Metadata not found.')
         return None
 
     metastr = ' - '.join(metalist)
@@ -190,13 +159,16 @@ def np(word, word_eol, userdata):
         metastr = get_mplayer_string()
 
     if metastr is None:
-        hexchat.prnt('Es wird zur zeit nichts abgespielt.')
+        hexchat.prnt('Nothing is playing at this time.')
         return hexchat.EAT_HEXCHAT
 
-    outputstr = '♫ {} ♫'.format(metastr)
-    hexchat.command('me is listening to: {}'.format(outputstr))
+    hexchat.command('me is listening to {}'.format(metastr))
     return hexchat.EAT_HEXCHAT
 
 
-hexchat.hook_command("NP", np, help="/NP Displays the current song if "
-                     "MPD is playing.")
+def unload(userdata):
+  print(__module_name__, 'v' + __module_version__, 'unloaded')
+
+hexchat.hook_command('np', np, help='Usage: NP, displays the current song that is playing')
+hexchat.hook_unload(unload)
+print(__module_name__, 'v' + __module_version__, 'loaded')
